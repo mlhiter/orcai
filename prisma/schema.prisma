@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CourseStatus {
+  draft
+  ready
+  failed
+}
+
+enum JobStatus {
+  queued
+  running
+  done
+  failed
+}
+
+model Topic {
+  id              String          @id @default(cuid())
+  rawQuery        String
+  normalizedQuery String
+  lang            String          @default("zh")
+  topicKey        String          @unique
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  courses         Course[]
+  jobs            GenerationJob[]
+
+  @@unique([normalizedQuery, lang])
+  @@index([normalizedQuery, lang])
+  @@map("topics")
+}
+
+model Course {
+  id          String          @id @default(cuid())
+  topicId     String
+  topic       Topic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  title       String
+  summary     String
+  status      CourseStatus    @default(draft)
+  version     Int
+  contentJson Json
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  jobs        GenerationJob[]
+
+  @@unique([topicId, version])
+  @@index([topicId])
+  @@index([createdAt])
+  @@map("courses")
+}
+
+model GenerationJob {
+  id              String           @id @default(cuid())
+  topicId         String
+  topic           Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  courseId        String?
+  course          Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  status          JobStatus        @default(queued)
+  error           String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  modelConfigJson Json?
+  attempt         Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  evidenceItems   SearchEvidence[]
+
+  @@index([topicId, status])
+  @@index([createdAt])
+  @@map("generation_jobs")
+}
+
+model SearchEvidence {
+  id           String        @id @default(cuid())
+  jobId        String
+  job          GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  url          String
+  title        String
+  snippet      String
+  qualityScore Float?
+  fetchedAt    DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+
+  @@unique([jobId, url])
+  @@index([jobId])
+  @@index([url])
+  @@map("search_evidence")
+}
