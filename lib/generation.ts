@@ -38,7 +38,81 @@ export type TopicStatusSnapshot = {
     title: string;
     updatedAt: string;
   } | null;
+  history: Array<{
+    id: string;
+    jobId: string;
+    status: JobStatus;
+    text: string;
+    at: string;
+  }>;
 };
+
+type JobHistorySeed = {
+  id: string;
+  status: JobStatus;
+  error: string | null;
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  updatedAt: Date;
+};
+
+function buildTopicHistory(seeds: JobHistorySeed[]): TopicStatusSnapshot["history"] {
+  const events: TopicStatusSnapshot["history"] = [];
+
+  for (const seed of seeds) {
+    events.push({
+      id: `${seed.id}-queued-${seed.createdAt.getTime()}`,
+      jobId: seed.id,
+      status: "queued",
+      text: "任务已创建并进入队列。",
+      at: seed.createdAt.toISOString(),
+    });
+
+    if (seed.startedAt) {
+      events.push({
+        id: `${seed.id}-running-${seed.startedAt.getTime()}`,
+        jobId: seed.id,
+        status: "running",
+        text: "任务开始执行，正在生成内容。",
+        at: seed.startedAt.toISOString(),
+      });
+    } else if (seed.status === "running") {
+      events.push({
+        id: `${seed.id}-running-${seed.updatedAt.getTime()}`,
+        jobId: seed.id,
+        status: "running",
+        text: "任务开始执行，正在生成内容。",
+        at: seed.updatedAt.toISOString(),
+      });
+    }
+
+    if (seed.status === "done") {
+      const doneAt = seed.finishedAt ?? seed.updatedAt;
+      events.push({
+        id: `${seed.id}-done-${doneAt.getTime()}`,
+        jobId: seed.id,
+        status: "done",
+        text: "任务已完成，新版本课程已生成。",
+        at: doneAt.toISOString(),
+      });
+    }
+
+    if (seed.status === "failed") {
+      const failedAt = seed.finishedAt ?? seed.updatedAt;
+      events.push({
+        id: `${seed.id}-failed-${failedAt.getTime()}`,
+        jobId: seed.id,
+        status: "failed",
+        text: seed.error ? `任务失败：${seed.error}` : "任务执行失败。",
+        at: failedAt.toISOString(),
+      });
+    }
+  }
+
+  events.sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime());
+  return events.slice(0, 16);
+}
 
 function parseMinModules(): number {
   const raw = Number(process.env.MIN_MODULES);
@@ -219,7 +293,7 @@ export async function getTopicStatus(topicKey: string): Promise<TopicStatusSnaps
     return null;
   }
 
-  const [job, course] = await Promise.all([
+  const [job, course, jobs] = await Promise.all([
     prisma.generationJob.findFirst({
       where: {
         topicId: topic.id,
@@ -249,6 +323,24 @@ export async function getTopicStatus(topicKey: string): Promise<TopicStatusSnaps
         updatedAt: true,
       },
     }),
+    prisma.generationJob.findMany({
+      where: {
+        topicId: topic.id,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 8,
+      select: {
+        id: true,
+        status: true,
+        error: true,
+        createdAt: true,
+        startedAt: true,
+        finishedAt: true,
+        updatedAt: true,
+      },
+    }),
   ]);
 
   if (job?.status === "queued") {
@@ -273,6 +365,7 @@ export async function getTopicStatus(topicKey: string): Promise<TopicStatusSnaps
           updatedAt: course.updatedAt.toISOString(),
         }
       : null,
+    history: buildTopicHistory(jobs),
   };
 }
 

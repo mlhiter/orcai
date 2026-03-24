@@ -276,6 +276,29 @@ li + li {
   margin-top: 20px;
 }
 
+.statusTimeline {
+  margin-top: 6px;
+  list-style: none;
+  padding-left: 0;
+}
+
+.statusTimeline li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px dashed #d7e0eb;
+}
+
+.statusTimeline li:first-child {
+  border-top: none;
+}
+
+.statusTimeline span:first-child {
+  font-size: 14px;
+  color: #27384f;
+}
+
 .statusPulse {
   width: 12px;
   height: 12px;

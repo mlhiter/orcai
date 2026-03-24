@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CoursePending } from "@/components/course-pending";
 import { CourseView } from "@/components/course-view";
 import { RefreshCourseButton } from "@/components/refresh-course-button";
-import { getCourseSnapshot } from "@/lib/generation";
+import { getCourseSnapshot, getTopicStatus } from "@/lib/generation";
 import { CourseContentSchema } from "@/lib/tutorial-schema";
 
 type CoursePageProps = {
@@ -13,17 +13,21 @@ type CoursePageProps = {
 
 export default async function CoursePage({ params }: CoursePageProps) {
   const { topicKey } = await params;
-  const snapshot = await getCourseSnapshot(topicKey);
+  const [snapshot, topicStatus] = await Promise.all([getCourseSnapshot(topicKey), getTopicStatus(topicKey)]);
 
-  if (!snapshot) {
+  if (!snapshot || !topicStatus) {
     notFound();
   }
+
+  const hasActiveJob = topicStatus.job ? ["queued", "running", "failed"].includes(topicStatus.job.status) : false;
+  const initialJob = topicStatus.job;
+  const initialHistory = topicStatus.history;
 
   return (
     <main>
       <div className="toolbar">
-        <Link className="btnGhost" href="/">
-          返回首页
+        <Link href="/">
+          ← 返回首页
         </Link>
         <RefreshCourseButton topicKey={topicKey} />
       </div>
@@ -33,6 +37,16 @@ export default async function CoursePage({ params }: CoursePageProps) {
         <h2>{snapshot.topic.rawQuery}</h2>
         <p className="small">TopicKey: {snapshot.topic.topicKey}</p>
       </section>
+
+      {snapshot.course && hasActiveJob ? (
+        <CoursePending
+          topicKey={topicKey}
+          baselineVersion={snapshot.course.version}
+          title="正在生成最新版本"
+          initialJob={initialJob}
+          initialHistory={initialHistory}
+        />
+      ) : null}
 
       {snapshot.course ? (
         (() => {
@@ -49,7 +63,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
           return <CourseView content={parsed.data} />;
         })()
       ) : (
-        <CoursePending topicKey={topicKey} />
+        <CoursePending topicKey={topicKey} initialJob={initialJob} initialHistory={initialHistory} />
       )}
     </main>
   );
