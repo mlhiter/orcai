@@ -249,33 +249,70 @@ export async function generateOrReuse(payload: GeneratePayload): Promise<Generat
   return result;
 }
 
-export async function refreshTopic(topicKey: string): Promise<{ jobId: string }> {
-  const topic = await prisma.topic.findUnique({
-    where: {
-      topicKey,
-    },
-    select: {
-      id: true,
-    },
-  });
+export async function refreshTopic(topicKey: string): Promise<{ jobId: string; reused: boolean }> {
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const topic = await tx.topic.findUnique({
+        where: {
+          topicKey,
+        },
+        select: {
+          id: true,
+        },
+      });
 
-  if (!topic) {
-    throw new Error("topic not found");
+      if (!topic) {
+        throw new Error("topic not found");
+      }
+
+      const activeJob = await tx.generationJob.findFirst({
+        where: {
+          topicId: topic.id,
+          status: {
+            in: ["queued", "running"],
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (activeJob) {
+        return {
+          jobId: activeJob.id,
+          reused: true,
+        };
+      }
+
+      const job = await tx.generationJob.create({
+        data: {
+          topicId: topic.id,
+          status: "queued",
+          modelConfigJson: modelConfigJson(),
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        jobId: job.id,
+        reused: false,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  if (!result.reused) {
+    startJobAsync(result.jobId);
   }
 
-  const job = await prisma.generationJob.create({
-    data: {
-      topicId: topic.id,
-      status: "queued",
-      modelConfigJson: modelConfigJson(),
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  startJobAsync(job.id);
-  return { jobId: job.id };
+  return result;
 }
 
 export async function getTopicStatus(topicKey: string): Promise<TopicStatusSnapshot | null> {

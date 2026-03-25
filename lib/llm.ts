@@ -17,6 +17,8 @@ type OpenAIResponse = {
   }>;
 };
 
+type ModuleReference = CourseContent["modules"][number]["references"][number];
+
 function buildResponsesUrl(): string {
   const configured = process.env.OPENAI_BASE_URL?.trim();
   const baseUrl = configured && configured.length > 0 ? configured : "https://api.openai.com/v1";
@@ -62,6 +64,24 @@ function extractJson(text: string): string {
   return text;
 }
 
+function toModuleReference(item: Evidence): ModuleReference {
+  return {
+    title: item.title,
+    url: item.url,
+    snippet: item.snippet || item.title,
+  };
+}
+
+function pickModuleReferences(evidence: Evidence[], moduleIndex: number): ModuleReference[] {
+  if (evidence.length === 0) return [];
+
+  const count = Math.min(3, evidence.length);
+  return Array.from({ length: count }).map((_, offset) => {
+    const index = (moduleIndex + offset) % evidence.length;
+    return toModuleReference(evidence[index]);
+  });
+}
+
 function fallbackContent(query: string, evidence: Evidence[], minModules: number): CourseContent {
   const evidenceSummary = evidence.slice(0, 3).map((item) => item.title);
   const modules = Array.from({ length: minModules }).map((_, idx) => ({
@@ -71,6 +91,7 @@ function fallbackContent(query: string, evidence: Evidence[], minModules: number
     principle: `拆解该场景背后的原理和决策逻辑。`,
     pitfalls: ["只记定义不做验证", "忽略上下文与边界条件"],
     summary: `完成本章后，你应当能复述并应用该章节知识。`,
+    references: pickModuleReferences(evidence, idx),
   }));
 
   return {
@@ -137,6 +158,7 @@ async function generateWithOpenAI(input: GenerateInput): Promise<CourseContent> 
     "3) 每章包含 concept/scenario/principle/pitfalls/summary。",
     "4) 内容应可学习、可执行，避免空泛。",
     "5) 使用简体中文输出。",
+    "6) 每章包含 references 数组，元素为 title/url/snippet；无法给出来源时返回空数组。",
   ].join("\n");
 
   const userPrompt = [
@@ -161,7 +183,14 @@ async function generateWithOpenAI(input: GenerateInput): Promise<CourseContent> 
       "scenario": "string",
       "principle": "string",
       "pitfalls": ["string"],
-      "summary": "string"
+      "summary": "string",
+      "references": [
+        {
+          "title": "string",
+          "url": "https://example.com",
+          "snippet": "string"
+        }
+      ]
     }
   ],
   "practiceExamples": [

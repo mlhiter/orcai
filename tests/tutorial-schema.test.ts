@@ -61,4 +61,27 @@ describe("course schema", () => {
 
     expect(expanded.modules).toHaveLength(2);
   });
+
+  it("defaults module references to empty arrays", () => {
+    const content = CourseContentSchema.parse(sampleCourse());
+
+    expect(content.modules[0]?.references).toEqual([]);
+  });
+
+  it("accepts valid module references", () => {
+    const input = sampleCourse();
+    input.modules[0] = {
+      ...input.modules[0],
+      references: [
+        {
+          title: "Kubernetes Docs",
+          url: "https://kubernetes.io/docs/concepts/scheduling-eviction/",
+          snippet: "Official scheduling overview.",
+        },
+      ],
+    };
+
+    const content = CourseContentSchema.parse(input);
+    expect(content.modules[0]?.references).toHaveLength(1);
+  });
 });

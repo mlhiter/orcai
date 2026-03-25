@@ -261,6 +261,16 @@ button:disabled {
   color: #2f3f53;
 }
 
+.moduleCard a {
+  color: #0f4f8a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.moduleCard a:hover {
+  color: #0b3f6d;
+}
+
 ul,
 ol {
   margin: 8px 0;

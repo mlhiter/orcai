@@ -7,7 +7,7 @@ ORCAI 是一个知识点到结构化教程的生成平台 MVP。
 - 输入知识点，生成结构化教程
 - 同知识点复用已有教程版本
 - 支持手动刷新，创建新版本
-- 生成流程内部使用 Web 搜索 + LLM 进行 grounding（首版不展示引用）
+- 生成流程使用 Web 搜索 + LLM 进行 grounding，并在章节中展示参考来源
 
 ## 快速开始
 
@@ -63,6 +63,7 @@ npm run dev
   - 返回: 复用命中或任务创建结果
 - `POST /api/tutorials/refresh`
   - 入参: `{ topicKey: string }`
+  - 行为: 若存在进行中的任务（queued/running）则直接复用该任务（幂等）
 - `GET /api/topics/:topicKey/status`
   - 返回: 当前任务状态与最新课程信息
 

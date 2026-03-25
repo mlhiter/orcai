@@ -57,6 +57,23 @@ export function CourseView({ content }: { content: CourseContent }) {
                 <strong>小结：</strong>
                 {moduleItem.summary}
               </p>
+              <p>
+                <strong>参考来源：</strong>
+              </p>
+              {moduleItem.references.length > 0 ? (
+                <ul>
+                  {moduleItem.references.map((reference, index) => (
+                    <li key={`${reference.url}-${index}`}>
+                      <a href={reference.url} target="_blank" rel="noreferrer">
+                        {reference.title}
+                      </a>
+                      <p className="small">{reference.snippet}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="small">暂无引用</p>
+              )}
             </article>
           ))}
         </div>
